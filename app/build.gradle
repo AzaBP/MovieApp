@@ -1,5 +1,54 @@
 plugins {
-    alias(libs.plugins.android.application)
+    id 'com.android.application'
+    id "org.sonarqube" version "5.1.0.4882"
+    id 'jacoco'
+}
+
+apply plugin: "jacoco"
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+    jacoco.excludes = ['jdk.internal.*'] // needed to support roboelectric with jacoco
+}
+
+task jacocoTestReport(type: JacocoReport, dependsOn: ['testDebugUnitTest', 'connectedDebugAndroidTest']) {
+
+    reports {
+        xml.required = true
+        html.required = true
+    }
+
+    def fileFilter = ['**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*', '**/*Test*.*', 'android/**/*.*']
+    def mainSrc = "$project.projectDir/src/main/java"
+    // Nota: La ruta de las clases compiladas puede cambiar dependiendo de la versión de AGP usada.
+    def javaTree = fileTree(dir: "$project.buildDir/intermediates/javac/debug/compileDebugJavaWithJavac", excludes: fileFilter)
+
+    sourceDirectories.setFrom(files([mainSrc]))
+    classDirectories.setFrom(files([javaTree]))
+    executionData.setFrom(fileTree(dir: project.buildDir, includes: ['jacoco/testDebugUnitTest.exec', 'outputs/code-coverage/connected/*coverage.ec']))
+}
+
+// to launch sonar: gradlew.bat clean jacocoTestReport sonarqube
+sonar {
+    properties {
+        property "sonar.host.url", "https://sonarcloud.io"
+        property "sonar.organization", "isuc"
+        property "sonar.token", "120537998e2c122476f30cade8d4a25865210fa6"
+        property "sonar.projectKey", "AppMovies-Azahara"
+        property "sonar.projectName", "AppMovies-Azahara"
+
+        // I need this property to avoid the error where sonarqube does not close some files and
+        // prevents a clean afterwards
+        property "sonar.scm.disabled", true
+
+        // this property is deprecated, now I use the xml file defined below it
+        // property "sonar.jacoco.reportPaths", "${project.buildDir}/jacoco/testDebugUnitTest.exec"
+        property "sonar.coverage.jacoco.xmlReportPaths", "${project.buildDir}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
+    }
 }
 
 android {
@@ -45,16 +94,4 @@ dependencies {
     implementation 'com.github.bumptech.glide:glide:4.16.0'
 
 
-}
-
-sonar {
-    properties {
-        property "sonar.projectName", "App-Movies"
-        property "sonar.projectKey", "es.unican.moviesapp"
-        property "sonar.host.url", "http://localhost:9000"
-        property "sonar.language", "java"
-        property "sonar.sources", "src/main/java"
-        property "sonar.binaries", "build/intermediates/javac/debug"
-        property "sonar.gradle.skipCompile", "true"
-    }
 }
